@@ -1,17 +1,29 @@
 package com.sky.service.impl;
 
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import com.sky.constant.MessageConstant;
 import com.sky.constant.StatusConstant;
+import com.sky.context.BaseContext;
+import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
+import com.sky.dto.EmployeePageQueryDTO;
+import com.sky.dto.PasswordEditDTO;
 import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
 import com.sky.exception.PasswordErrorException;
 import com.sky.mapper.EmployeeMapper;
+import com.sky.result.PageResult;
 import com.sky.service.EmployeeService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
 
 @Service
 @Slf4j
@@ -54,4 +66,66 @@ public class EmployeeServiceImpl implements EmployeeService {
         //3、返回实体对象
         return employee;
     }
+
+    /**
+     * 修改密码
+     * @param passwordEditDTO
+     * @return
+     */
+    public String repassword(PasswordEditDTO passwordEditDTO) {
+        Integer empId = passwordEditDTO.getEmpId();
+
+        String oldPassword = passwordEditDTO.getOldPassword();
+        String newPassword = passwordEditDTO.getNewPassword();
+
+        //1、根据员工id查询员工信息
+        Employee employee = employeeMapper.getById(empId);
+
+        if (employee == null) {
+            throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        // 比对旧密码
+        if (!oldPassword.equals(employee.getPassword())) {
+            throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
+        }
+
+        //2、比对旧密码重复
+        if (oldPassword.equals(newPassword)) {
+            throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR_SAME);
+        }
+
+        String username = employee.getUsername();
+
+        //3、更新新密码
+        employeeMapper.updatePassword(username,newPassword);
+
+        return "密码修改成功";
+    }
+
+    public void addEmployee(EmployeeDTO employeeDTO) {
+        Employee employee = new Employee();
+        BeanUtils.copyProperties(employeeDTO, employee);
+        employee.setStatus(StatusConstant.ENABLE);
+        employee.setCreateTime(LocalDateTime.now());
+        employee.setUpdateTime(LocalDateTime.now());
+        employee.setPassword("1234");
+        employee.setCreateUser(BaseContext.getCurrentId());
+        employee.setUpdateUser(BaseContext.getCurrentId());
+
+
+        employeeMapper.insertEmployee(employee);
+
+    }
+
+    public PageResult pagerank(EmployeePageQueryDTO employeePageQueryDTO) {
+
+        // 设置分页参数
+        PageHelper.startPage(employeePageQueryDTO.getPage(),employeePageQueryDTO.getPageSize());
+        // 查询员工列表 + 强转
+        Page<Employee> page = employeeMapper.list(employeePageQueryDTO.getName());
+
+        return new PageResult(page.getTotal(),page.getResult());
+    }
+
 }
